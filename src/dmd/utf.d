@@ -271,6 +271,7 @@ bool isUniAlpha(dchar c)
         [0x212A, 0x2131],
         [0x2133, 0x2138],
         [0x2160, 0x2182],
+        [0x2200, 0x22FF], //AQ: Math symbols
         [0x3005, 0x3007],
         [0x3021, 0x3029],
         [0x3041, 0x3093],
@@ -279,7 +280,7 @@ bool isUniAlpha(dchar c)
         [0x30FB, 0x30FC],
         [0x3105, 0x312C],
         [0x4E00, 0x9FA5],
-        [0xAC00, 0xD7A3]
+        [0xAC00, 0xD7A3],
     ];
 
     size_t high = ALPHA_TABLE.length - 1;
