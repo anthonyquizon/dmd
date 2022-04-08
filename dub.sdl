@@ -22,13 +22,12 @@ subPackage {
     "src/dmd/console.d" \
     "src/dmd/entity.d" \
     "src/dmd/errors.d" \
-    "src/dmd/filecache.d" \
+    "src/dmd/file_manager.d" \
     "src/dmd/globals.d" \
     "src/dmd/id.d" \
     "src/dmd/identifier.d" \
     "src/dmd/lexer.d" \
     "src/dmd/tokens.d" \
-    "src/dmd/utf.d" \
     "src/dmd/utils.d"
 
   versions \
@@ -92,7 +91,7 @@ subPackage {
     console,\
     entity,\
     errors,\
-    filecache,\
+    file_manager,\
     globals,\
     id,\
     identifier,\

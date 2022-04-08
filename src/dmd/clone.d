@@ -2,9 +2,9 @@
  * Builds struct member functions if needed and not defined by the user.
  * Includes `opEquals`, `opAssign`, post blit, copy constructor and destructor.
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/clone.d, _clone.d)
  * Documentation:  https://dlang.org/phobos/dmd_clone.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/clone.d
@@ -521,9 +521,9 @@ FuncDeclaration buildOpEquals(StructDeclaration sd, Scope* sc)
 
 /******************************************
  * Build __xopEquals for TypeInfo_Struct
- *      static bool __xopEquals(ref const S p, ref const S q)
+ *      bool __xopEquals(ref const S p) const
  *      {
- *          return p == q;
+ *          return this == p;
  *      }
  *
  * This is called by TypeInfo.equals(p1, p2). If the struct does not support
@@ -570,15 +570,16 @@ FuncDeclaration buildXopEquals(StructDeclaration sd, Scope* sc)
     Loc declLoc; // loc is unnecessary so __xopEquals is never called directly
     Loc loc; // loc is unnecessary so errors are gagged
     auto parameters = new Parameters();
-    parameters.push(new Parameter(STC.ref_ | STC.const_, sd.type, Id.p, null, null))
-              .push(new Parameter(STC.ref_ | STC.const_, sd.type, Id.q, null, null));
-    auto tf = new TypeFunction(ParameterList(parameters), Type.tbool, LINK.d);
+    parameters.push(new Parameter(STC.ref_ | STC.const_, sd.type, Id.p, null, null));
+    auto tf = new TypeFunction(ParameterList(parameters), Type.tbool, LINK.d, STC.const_);
+    tf = tf.addSTC(STC.const_).toTypeFunction();
     Identifier id = Id.xopEquals;
-    auto fop = new FuncDeclaration(declLoc, Loc.initial, id, STC.static_, tf);
+    auto fop = new FuncDeclaration(declLoc, Loc.initial, id, 0, tf);
     fop.generated = true;
-    Expression e1 = new IdentifierExp(loc, Id.p);
-    Expression e2 = new IdentifierExp(loc, Id.q);
-    Expression e = new EqualExp(TOK.equal, loc, e1, e2);
+    fop.parent = sd;
+    Expression e1 = new IdentifierExp(loc, Id.This);
+    Expression e2 = new IdentifierExp(loc, Id.p);
+    Expression e = new EqualExp(EXP.equal, loc, e1, e2);
     fop.fbody = new ReturnStatement(loc, e);
     uint errors = global.startGagging(); // Do not report errors
     Scope* sc2 = sc.push();
@@ -594,9 +595,9 @@ FuncDeclaration buildXopEquals(StructDeclaration sd, Scope* sc)
 
 /******************************************
  * Build __xopCmp for TypeInfo_Struct
- *      static bool __xopCmp(ref const S p, ref const S q)
+ *      int __xopCmp(ref const S p) const
  *      {
- *          return p.opCmp(q);
+ *          return this.opCmp(p);
  *      }
  *
  * This is called by TypeInfo.compare(p1, p2). If the struct does not support
@@ -642,13 +643,13 @@ FuncDeclaration buildXopCmp(StructDeclaration sd, Scope* sc)
                 Dsymbol s = null;
                 switch (e.op)
                 {
-                case TOK.overloadSet:
+                case EXP.overloadSet:
                     s = (cast(OverExp)e).vars;
                     break;
-                case TOK.scope_:
+                case EXP.scope_:
                     s = (cast(ScopeExp)e).sds;
                     break;
-                case TOK.variable:
+                case EXP.variable:
                     s = (cast(VarExp)e).var;
                     break;
                 default:
@@ -691,14 +692,15 @@ FuncDeclaration buildXopCmp(StructDeclaration sd, Scope* sc)
     Loc loc; // loc is unnecessary so errors are gagged
     auto parameters = new Parameters();
     parameters.push(new Parameter(STC.ref_ | STC.const_, sd.type, Id.p, null, null));
-    parameters.push(new Parameter(STC.ref_ | STC.const_, sd.type, Id.q, null, null));
-    auto tf = new TypeFunction(ParameterList(parameters), Type.tint32, LINK.d);
+    auto tf = new TypeFunction(ParameterList(parameters), Type.tint32, LINK.d, STC.const_);
+    tf = tf.addSTC(STC.const_).toTypeFunction();
     Identifier id = Id.xopCmp;
-    auto fop = new FuncDeclaration(declLoc, Loc.initial, id, STC.static_, tf);
+    auto fop = new FuncDeclaration(declLoc, Loc.initial, id, 0, tf);
     fop.generated = true;
-    Expression e1 = new IdentifierExp(loc, Id.p);
-    Expression e2 = new IdentifierExp(loc, Id.q);
-    Expression e = new CallExp(loc, new DotIdExp(loc, e2, Id.cmp), e1);
+    fop.parent = sd;
+    Expression e1 = new IdentifierExp(loc, Id.This);
+    Expression e2 = new IdentifierExp(loc, Id.p);
+    Expression e = new CallExp(loc, new DotIdExp(loc, e1, Id.cmp), e2);
     fop.fbody = new ReturnStatement(loc, e);
     uint errors = global.startGagging(); // Do not report errors
     Scope* sc2 = sc.push();

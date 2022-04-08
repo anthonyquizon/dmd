@@ -2,12 +2,12 @@
  * Define registers, register masks, and the CPU instruction linked list
  *
  * Compiler implementation of the
- * $(LINK2 http://www.dlang.org, D programming language).
+ * $(LINK2 https://www.dlang.org, D programming language).
  *
  * Copyright:   Copyright (C) 1985-1998 by Symantec
- *              Copyright (C) 2000-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ *              Copyright (C) 2000-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/backend/code.d, backend/_code.d)
  */
 
@@ -412,7 +412,6 @@ regm_t getscratch();
 void codelem(ref CodeBuilder cdb, elem *e, regm_t *pretregs, uint constflag);
 void scodelem(ref CodeBuilder cdb, elem *e, regm_t *pretregs, regm_t keepmsk, bool constflag);
 const(char)* regm_str(regm_t rm);
-int numbitsset(regm_t);
 
 /* cdxxx.c: functions that go into cdxxx[] table */
 void cdabs(ref CodeBuilder cdb, elem* e, regm_t* pretregs);
@@ -565,7 +564,7 @@ void jmpaddr (code *c);
 int code_match(code *c1,code *c2);
 uint calcblksize (code *c);
 uint calccodsize(code *c);
-uint codout(int seg, code *c);
+uint codout(int seg, code *c,Barray!ubyte*);
 size_t addtofixlist(Symbol *s , targ_size_t soffset , int seg , targ_size_t val , int flags );
 void searchfixlist(Symbol *s) {}
 void outfixlist();

@@ -1,10 +1,10 @@
 
 /* Compiler implementation of the D programming language
- * Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
+ * Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
  * written by Walter Bright
- * http://www.digitalmars.com
+ * https://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
- * http://www.boost.org/LICENSE_1_0.txt
+ * https://www.boost.org/LICENSE_1_0.txt
  * https://github.com/dlang/dmd/blob/master/src/dmd/mtype.h
  */
 
@@ -224,6 +224,7 @@ public:
     bool equivalent(Type *t);
     // kludge for template.isType()
     DYNCAST dyncast() const { return DYNCAST_TYPE; }
+    size_t getUniqueID() const;
     Covariant covariant(Type *t, StorageClass *pstc = NULL);
     const char *toChars() const;
     char *toPrettyChars(bool QualifyTypes = false);
@@ -552,7 +553,6 @@ enum class PURE : unsigned char
     fwdref = 1,     // it's pure, but not known which level yet
     weak = 2,       // no mutable globals are read or written
     const_ = 3,     // parameters are values or const
-    strong = 4      // parameters are values or immutable
 };
 
 class Parameter : public ASTNode

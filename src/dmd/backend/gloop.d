@@ -2,12 +2,12 @@
  * Global loop optimizations
  *
  * Compiler implementation of the
- * $(LINK2 http://www.dlang.org, D programming language).
+ * $(LINK2 https://www.dlang.org, D programming language).
  *
  * Copyright:   Copyright (C) 1985-1998 by Symantec
- *              Copyright (C) 2000-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ *              Copyright (C) 2000-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/backend/gloop.d, backend/gloop.d)
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/backend/gloop.d
  */
@@ -143,9 +143,8 @@ nothrow:
             elem_print(c1);
             printf("c2:");
             elem_print(c2);
-            printf("FLty = "); WRTYxx(FLty);
-            printf("\nFLivty = "); WRTYxx(FLivty);
-            printf("\n");
+            printf("FLty = %s\n", tym_str(FLty));
+            printf("FLivty = %s\n", tym_str(FLivty));
         }
     }
 }
@@ -459,7 +458,7 @@ L1:
      */
 
     // for each block in this loop
-    for (uint i = 0; (i = cast(uint) vec_index(i, l.Lloop)) < dfo.length; ++i)
+    foreach (i; VecRange(l.Lloop))
     {
         if (dfo[i].BC == BCret || dfo[i].BC == BCretexp || dfo[i].BC == BCexit)
             vec_setbit(i,l.Lexit); /* ret blocks are exit blocks */
@@ -1304,8 +1303,7 @@ private void markinvar(elem *n,vec_t rd)
             break;
 
         default:
-            WROP(n.Eoper);
-            //printf("n.Eoper = %d, OPconst = %d\n", n.Eoper, OPconst);
+            //printf("n.Eoper = %s, OPconst = %d\n", oper_str(n.Eoper), OPconst);
             assert(0);
     }
 
@@ -1862,7 +1860,7 @@ L3:
     debug
     {
         if (debugc) printf("movelis() introduced new variable '%s' of type ",t.EV.Vsym.Sident.ptr);
-        if (debugc) WRTYxx(t.Ety);
+        if (debugc) printf("%s\n", tym_str(t.Ety));
         if (debugc) printf("\n");
     }
 
@@ -2434,10 +2432,9 @@ private void ivfamelems(Iv *biv,elem **pn)
                     {   printf("found (biv op const), elem (");
                             WReqn(n);
                             printf(");\n");
-                            printf("Types: n1="); WRTYxx(n1.Ety);
-                            printf(" ty="); WRTYxx(ty);
-                            printf(" n2="); WRTYxx(n2.Ety);
-                            printf("\n");
+                            printf("Types: n1=%s", tym_str(n1.Ety));
+                            printf(" ty=%s", tym_str(ty));
+                            printf(" n2=%s\n", tym_str(n2.Ety));
                     }
 
                 auto fl = biv.IVfamily.push();
@@ -2621,7 +2618,7 @@ private void intronvars(ref Loop l)
             debug
             {
                 if (debugc) printf("intronvars() introduced new variable '%s' of type ",T.EV.Vsym.Sident.ptr);
-                if (debugc) WRTYxx(ty);
+                if (debugc) printf("%s\n", tym_str(ty));
                 if (debugc) printf("\n");
             }
 
@@ -3258,8 +3255,7 @@ private bool flcmp(const ref famlist f1, const ref famlist f2)
     {
         printf("f1: c1 = %d, c2 = %d\n",t1.Vshort,f1.c2.EV.Vshort);
         printf("f2: c1 = %d, c2 = %d\n",t2.Vshort,f2.c2.EV.Vshort);
-        WRTYxx((*f1.FLpelem).Ety);
-        WRTYxx((*f2.FLpelem).Ety);
+        printf("%s %s\n", tym_str((*f1.FLpelem).Ety), tym_str((*f2.FLpelem).Ety));
     }
 
     /* Wimp out and just pick f1 if the types don't match               */
@@ -3734,9 +3730,14 @@ bool loopunroll(ref Loop l)
     /* For simplification, only unroll loops that consist only
      * of a head and tail, and the tail is the exit block.
      */
-    int numblocks = 0;
+    const numblocks = vec_numBitsSet(l.Lloop);
+{   // Ensure no changes
+    if (dfo.length != vec_numbits(l.Lloop)) assert(0);
+    int n = 0;
     for (int i = 0; (i = cast(uint) vec_index(i, l.Lloop)) < dfo.length; ++i)  // for each block in loop
-        ++numblocks;
+        ++n;
+    if (n != numblocks) assert(0);
+}
     if (numblocks != 2)
     {
         if (log) printf("\tnot 2 blocks, but %d\n", numblocks);

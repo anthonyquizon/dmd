@@ -1,9 +1,9 @@
 /**
  * Convert a D symbol to a symbol the linker understands (with mangled name).
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/tocsym.d, _tocsym.d)
  * Documentation:  https://dlang.org/phobos/dmd_tocsym.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/tocsym.d
@@ -15,12 +15,12 @@ import core.stdc.stdio;
 import core.stdc.string;
 
 import dmd.root.array;
+import dmd.root.complex;
 import dmd.root.rmem;
 
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astenums;
-import dmd.complex;
 import dmd.ctfeexpr;
 import dmd.declaration;
 import dmd.dclass;
@@ -182,18 +182,10 @@ Symbol *toSymbol(Dsymbol s)
                     t = type_fake(TYdelegate);          // Tdelegate as C type
                 t.Tcount++;
             }
-            else if (vd.isParameter())
+            else if (vd.isParameter() && ISX64REF(vd))
             {
-                if (ISX64REF(vd))
-                {
-                    t = type_allocn(TYnref, Type_toCtype(vd.type));
-                    t.Tcount++;
-                }
-                else
-                {
-                    t = Type_toCtype(vd.type);
-                    t.Tcount++;
-                }
+                t = type_allocn(TYnref, Type_toCtype(vd.type));
+                t.Tcount++;
             }
             else
             {
@@ -257,7 +249,7 @@ Symbol *toSymbol(Dsymbol s)
                 /* if it's global or static, then it needs to have a qualified but unmangled name.
                  * This gives some explanation of the separation in treating name mangling.
                  * It applies to PDB format, but should apply to CV as PDB derives from CV.
-                 *    http://msdn.microsoft.com/en-us/library/ff553493(VS.85).aspx
+                 *    https://msdn.microsoft.com/en-us/library/ff553493%28VS.85%29.aspx
                  */
                 s.prettyIdent = vd.toPrettyChars(true);
             }
@@ -339,7 +331,9 @@ Symbol *toSymbol(Dsymbol s)
 
         override void visit(FuncDeclaration fd)
         {
-            const(char)* id = mangleExact(fd);
+            const(char)* id = (fd.linkage == LINK.c && fd.isCsymbol())
+                        ? fd.ident.toChars()
+                        : mangleExact(fd);
 
             //printf("FuncDeclaration.toSymbol(%s %s)\n", fd.kind(), fd.toChars());
             //printf("\tid = '%s'\n", id);
@@ -387,7 +381,9 @@ Symbol *toSymbol(Dsymbol s)
                         break;
                     case LINK.cpp:
                         s.Sflags |= SFLpublic;
-                        if (fd.isThis() && !target.is64bit && target.os == Target.OS.Windows)
+                        /* Nested functions use the same calling convention as
+                         * member functions, because both can be used as delegates. */
+                        if ((fd.isThis() || fd.isNested()) && !target.is64bit && target.os == Target.OS.Windows)
                         {
                             if ((cast(TypeFunction)fd.type).parameterList.varargs == VarArg.variadic)
                             {

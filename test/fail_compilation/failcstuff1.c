@@ -1,7 +1,6 @@
 // check the expression parser
-/* TEST_OUTPUT
+/* TEST_OUTPUT:
 ---
-fail_compilation/failcstuff1.c(51): Error: attributes should be specified before the function definition
 fail_compilation/failcstuff1.c(100): Error: no members for `enum E21962`
 fail_compilation/failcstuff1.c(101): Error: no members for anonymous enum
 fail_compilation/failcstuff1.c(152): Error: `;` or `,` expected
@@ -38,13 +37,13 @@ fail_compilation/failcstuff1.c(459): Error: static or type qualifier used outsid
 fail_compilation/failcstuff1.c(460): Error: variable length arrays are not supported
 fail_compilation/failcstuff1.c(460): Error: variable length array used outside of function prototype
 fail_compilation/failcstuff1.c(461): Error: array type has incomplete element type `int[0]`
-fail_compilation/failcstuff1.c(462): Error: `=`, `;` or `,` expected
+fail_compilation/failcstuff1.c(462): Error: `=`, `;` or `,` expected to end declaration instead of `const`
 fail_compilation/failcstuff1.c(502): Error: identifier or `(` expected
 fail_compilation/failcstuff1.c(502): Error: found `;` when expecting `)`
-fail_compilation/failcstuff1.c(503): Error: `=`, `;` or `,` expected
+fail_compilation/failcstuff1.c(503): Error: `=`, `;` or `,` expected to end declaration instead of `int`
 fail_compilation/failcstuff1.c(504): Error: identifier or `(` expected
 fail_compilation/failcstuff1.c(504): Error: found `;` when expecting `)`
-fail_compilation/failcstuff1.c(505): Error: `=`, `;` or `,` expected
+fail_compilation/failcstuff1.c(505): Error: `=`, `;` or `,` expected to end declaration instead of `int`
 ---
 */
 
@@ -147,3 +146,16 @@ void test22102()
     int();
     int var2;
 }
+
+
+/****************************************************/
+
+/* TEST_OUTPUT:
+---
+fail_compilation/failcstuff1.c(551): Error: missing comma or semicolon after declaration of `pluto`, found `p` instead
+---
+*/
+
+#line 550
+
+int * pluto p;

@@ -3,9 +3,9 @@
  *
  * Specification: $(LINK2 https://dlang.org/spec/module.html, Modules)
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dmodule.d, _dmodule.d)
  * Documentation:  https://dlang.org/phobos/dmd_dmodule.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/dmodule.d
@@ -31,6 +31,7 @@ import dmd.dsymbolsem;
 import dmd.errors;
 import dmd.expression;
 import dmd.expressionsem;
+import dmd.file_manager;
 import dmd.globals;
 import dmd.id;
 import dmd.identifier;
@@ -49,113 +50,6 @@ import dmd.semantic3;
 import dmd.target;
 import dmd.utils;
 import dmd.visitor;
-
-enum package_d  = "package." ~ mars_ext;
-enum package_di = "package." ~ hdr_ext;
-
-/********************************************
- * Look for the source file if it's different from filename.
- * Look for .di, .d, directory, and along global.path.
- * Does not open the file.
- * Params:
- *      filename = as supplied by the user
- *      path = path to look for filename
- * Returns:
- *      the found file name or
- *      `null` if it is not different from filename.
- */
-private const(char)[] lookForSourceFile(const char[] filename, const char*[] path)
-{
-    //printf("lookForSourceFile(`%.*s`)\n", cast(int)filename.length, filename.ptr);
-    /* Search along path[] for .di file, then .d file, then .i file, then .c file.
-     */
-    const sdi = FileName.forceExt(filename, hdr_ext);
-    if (FileName.exists(sdi) == 1)
-        return sdi;
-    scope(exit) FileName.free(sdi.ptr);
-
-    const sd = FileName.forceExt(filename, mars_ext);
-    if (FileName.exists(sd) == 1)
-        return sd;
-    scope(exit) FileName.free(sd.ptr);
-
-    const si = FileName.forceExt(filename, i_ext);
-    if (FileName.exists(si) == 1)
-        return si;
-    scope(exit) FileName.free(si.ptr);
-
-    const sc = FileName.forceExt(filename, c_ext);
-    if (FileName.exists(sc) == 1)
-        return sc;
-    scope(exit) FileName.free(sc.ptr);
-
-    if (FileName.exists(filename) == 2)
-    {
-        /* The filename exists and it's a directory.
-         * Therefore, the result should be: filename/package.d
-         * iff filename/package.d is a file
-         */
-        const ni = FileName.combine(filename, package_di);
-        if (FileName.exists(ni) == 1)
-            return ni;
-        FileName.free(ni.ptr);
-
-        const n = FileName.combine(filename, package_d);
-        if (FileName.exists(n) == 1)
-            return n;
-        FileName.free(n.ptr);
-    }
-    if (FileName.absolute(filename))
-        return null;
-    if (!path.length)
-        return null;
-    foreach (entry; path)
-    {
-        const p = entry.toDString();
-
-        const(char)[] n = FileName.combine(p, sdi);
-        if (FileName.exists(n) == 1) {
-            return n;
-        }
-        FileName.free(n.ptr);
-
-        n = FileName.combine(p, sd);
-        if (FileName.exists(n) == 1) {
-            return n;
-        }
-        FileName.free(n.ptr);
-
-        n = FileName.combine(p, si);
-        if (FileName.exists(n) == 1) {
-            return n;
-        }
-        FileName.free(n.ptr);
-
-        n = FileName.combine(p, sc);
-        if (FileName.exists(n) == 1) {
-            return n;
-        }
-        FileName.free(n.ptr);
-
-        const b = FileName.removeExt(filename);
-        n = FileName.combine(p, b);
-        FileName.free(b.ptr);
-        if (FileName.exists(n) == 2)
-        {
-            const n2i = FileName.combine(n, package_di);
-            if (FileName.exists(n2i) == 1)
-                return n2i;
-            FileName.free(n2i.ptr);
-            const n2 = FileName.combine(n, package_d);
-            if (FileName.exists(n2) == 1) {
-                return n2;
-            }
-            FileName.free(n2.ptr);
-        }
-        FileName.free(n.ptr);
-    }
-    return null;
-}
 
 // function used to call semantic3 on a module's dependencies
 void semantic3OnDependencies(Module m)
@@ -414,7 +308,7 @@ extern (C++) class Package : ScopeDsymbol
             packages ~= s.ident;
         reverse(packages);
 
-        if (lookForSourceFile(getFilename(packages, ident), global.path ? (*global.path)[] : null))
+        if (FileManager.lookForSourceFile(getFilename(packages, ident), global.path ? (*global.path)[] : null))
             Module.load(Loc.initial, packages, this.ident);
         else
             isPkgMod = PKG.package_;
@@ -612,7 +506,7 @@ extern (C++) final class Module : Package
         //  foo\bar\baz
         const(char)[] filename = getFilename(packages, ident);
         // Look for the source file
-        if (const result = lookForSourceFile(filename, global.path ? (*global.path)[] : null))
+        if (const result = FileManager.lookForSourceFile(filename, global.path ? (*global.path)[] : null))
             filename = result; // leaks
 
         auto m = new Module(loc, filename, ident, 0, 0);
@@ -632,15 +526,6 @@ extern (C++) final class Module : Package
         }
         m = m.parse();
 
-        // Call onImport here because if the module is going to be compiled then we
-        // need to determine it early because it affects semantic analysis. This is
-        // being done after parsing the module so the full module name can be taken
-        // from whatever was declared in the file.
-        if (!m.isRoot() && Compiler.onImport(m))
-        {
-            m.importedFrom = m;
-            assert(m.isRoot());
-        }
         return m;
     }
 
@@ -730,6 +615,14 @@ extern (C++) final class Module : Package
             const dmdConfFile = global.inifilename.length ? FileName.canonicalName(global.inifilename) : "not found";
             errorSupplemental(loc, "config file: %.*s", cast(int)dmdConfFile.length, dmdConfFile.ptr);
         }
+        else if (FileName.ext(this.arg) || !loc.isValid())
+        {
+            // Modules whose original argument name has an extension, or do not
+            // have a valid location come from the command-line.
+            // Error that their file cannot be found and return early.
+            .error(loc, "cannot find input file `%s`", srcfile.toChars());
+            return false;
+        }
         else
         {
             // if module is not named 'package' but we're trying to read 'package.d', we're looking for a package module
@@ -781,14 +674,29 @@ extern (C++) final class Module : Package
             return true; // already read
 
         //printf("Module::read('%s') file '%s'\n", toChars(), srcfile.toChars());
-        auto readResult = File.read(srcfile.toChars());
 
-        if (global.params.emitMakeDeps)
+
+
+        bool success;
+        if (auto readResult = FileManager.fileManager.lookup(srcfile))
+        {
+            srcBuffer = readResult;
+            success = true;
+        }
+        else
+        {
+            auto readResult = File.read(srcfile.toChars());
+            if (loadSourceBuffer(loc, readResult))
+            {
+                FileManager.fileManager.add(srcfile, srcBuffer);
+                success = true;
+            }
+        }
+        if (success && global.params.emitMakeDeps)
         {
             global.params.makeDeps.push(srcfile.toChars());
         }
-
-        return loadSourceBuffer(loc, readResult);
+        return success;
     }
 
     /// syntactic parse
@@ -932,7 +840,7 @@ extern (C++) final class Module : Package
         if (buf.length >= 2)
         {
             /* Convert all non-UTF-8 formats to UTF-8.
-             * BOM : http://www.unicode.org/faq/utf_bom.html
+             * BOM : https://www.unicode.org/faq/utf_bom.html
              * 00 00 FE FF  UTF-32BE, big-endian
              * FF FE 00 00  UTF-32LE, little-endian
              * FE FF        UTF-16BE, big-endian
@@ -1057,6 +965,16 @@ extern (C++) final class Module : Package
             isHdrFile = true;
         }
 
+        /// Promote `this` to a root module if requested via `-i`
+        void checkCompiledImport()
+        {
+            if (!this.isRoot() && Compiler.onImport(this))
+                this.importedFrom = this;
+        }
+
+        DsymbolTable dst;
+        Package ppack = null;
+
         /* If it has the extension ".c", it is a "C" file.
          * If it has the extension ".i", it is a preprocessed "C" file.
          */
@@ -1066,33 +984,41 @@ extern (C++) final class Module : Package
 
             scope p = new CParser!AST(this, buf, cast(bool) docfile, target.c);
             p.nextToken();
+            checkCompiledImport();
             members = p.parseModule();
-            md = p.md;
+            assert(!p.md); // C doesn't have module declarations
             numlines = p.scanloc.linnum;
         }
         else
         {
             scope p = new Parser!AST(this, buf, cast(bool) docfile);
             p.nextToken();
-            members = p.parseModule();
+            p.parseModuleDeclaration();
             md = p.md;
+
+            if (md)
+            {
+                /* A ModuleDeclaration, md, was provided.
+                * The ModuleDeclaration sets the packages this module appears in, and
+                * the name of this module.
+                */
+                this.ident = md.id;
+                dst = Package.resolve(md.packages, &this.parent, &ppack);
+            }
+
+            // Done after parsing the module header because `module x.y.z` may override the file name
+            checkCompiledImport();
+
+            members = p.parseModuleContent();
             numlines = p.scanloc.linnum;
         }
         srcBuffer.destroy();
         srcBuffer = null;
         /* The symbol table into which the module is to be inserted.
          */
-        DsymbolTable dst;
+
         if (md)
         {
-            /* A ModuleDeclaration, md, was provided.
-             * The ModuleDeclaration sets the packages this module appears in, and
-             * the name of this module.
-             */
-            this.ident = md.id;
-            Package ppack = null;
-            dst = Package.resolve(md.packages, &this.parent, &ppack);
-
             // Mark the package path as accessible from the current module
             // https://issues.dlang.org/show_bug.cgi?id=21661
             // Code taken from Import.addPackageAccess()
@@ -1296,10 +1222,13 @@ extern (C++) final class Module : Package
             if (StringExp se = msg ? msg.toStringExp() : null)
             {
                 const slice = se.peekString();
-                deprecation(loc, "is deprecated - %.*s", cast(int)slice.length, slice.ptr);
+                if (slice.length)
+                {
+                    deprecation(loc, "is deprecated - %.*s", cast(int)slice.length, slice.ptr);
+                    return;
+                }
             }
-            else
-                deprecation(loc, "is deprecated");
+            deprecation(loc, "is deprecated");
         }
     }
 

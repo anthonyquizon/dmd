@@ -1,9 +1,9 @@
 /**
  * Read a file from disk and store it in memory.
  *
- * Copyright: Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:   Walter Bright, http://www.digitalmars.com
- * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright: Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:   Walter Bright, https://www.digitalmars.com
+ * License:   $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:    $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/root/file.d, root/_file.d)
  * Documentation:  https://dlang.org/phobos/dmd_root_file.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/root/file.d
@@ -120,11 +120,10 @@ nothrow:
                 perror("\tclose error");
                 goto err;
             }
-            // Always store a wchar ^Z past end of buffer so scanner has a sentinel
-            buffer[size] = 0; // ^Z is obsolete, use 0
-            buffer[size + 1] = 0;
-            buffer[size + 2] = 0; //add two more so lexer doesnt read pass the buffer
-            buffer[size + 3] = 0;
+            // Always store a wchar ^Z past end of buffer so scanner has a
+            // sentinel, although ^Z got obselete, so fill with two 0s and add
+            // two more so lexer doesn't read pass the buffer.
+            buffer[size .. size + 4] = 0;
 
             result.success = true;
             result.buffer.data = buffer[0 .. size];
@@ -160,11 +159,10 @@ nothrow:
                 goto err2;
             if (!CloseHandle(h))
                 goto err;
-            // Always store a wchar ^Z past end of buffer so scanner has a sentinel
-            buffer[size] = 0; // ^Z is obsolete, use 0
-            buffer[size + 1] = 0;
-            buffer[size + 2] = 0; //add two more so lexer doesnt read pass the buffer
-            buffer[size + 3] = 0;
+            // Always store a wchar ^Z past end of buffer so scanner has a
+            // sentinel, although ^Z got obselete, so fill with two 0s and add
+            // two more so lexer doesn't read pass the buffer.
+            buffer[size .. size + 4] = 0;
             result.success = true;
             result.buffer.data = buffer[0 .. size];
             return result;

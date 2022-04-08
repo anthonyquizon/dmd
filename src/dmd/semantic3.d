@@ -1,9 +1,9 @@
 /**
  * Performs the semantic3 stage, which deals with function bodies.
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/semantic3.d, _semantic3.d)
  * Documentation:  https://dlang.org/phobos/dmd_semantic3.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/semantic3.d
@@ -58,11 +58,11 @@ import dmd.root.filename;
 import dmd.common.outbuffer;
 import dmd.root.rmem;
 import dmd.root.rootobject;
+import dmd.root.utf;
 import dmd.sideeffect;
 import dmd.statementsem;
 import dmd.staticassert;
 import dmd.tokens;
-import dmd.utf;
 import dmd.semantic2;
 import dmd.statement;
 import dmd.target;
@@ -235,6 +235,18 @@ private extern(C++) final class Semantic3Visitor : Visitor
         if (funcdecl.errors || isError(funcdecl.parent))
         {
             funcdecl.errors = true;
+
+            // Mark that the return type could not be inferred
+            if (funcdecl.inferRetType)
+            {
+                assert(funcdecl.type);
+                auto tf = funcdecl.type.isTypeFunction();
+
+                // Only change the return type s.t. other analysis is
+                // still possible e.g. missmatched parameter types
+                if (tf && !tf.next)
+                    tf.next = Type.terror;
+            }
             return;
         }
         //printf("FuncDeclaration::semantic3('%s.%s', %p, sc = %p, loc = %s)\n", funcdecl.parent.toChars(), funcdecl.toChars(), funcdecl, sc, funcdecl.loc.toChars());
@@ -407,8 +419,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                     sc2.insert(_arguments);
                     _arguments.parent = funcdecl;
                 }
-                if ((f.linkage == LINK.d || f.parameterList.length) &&
-                    !(sc.flags & SCOPE.Cfile))  // don't want to require importing stdarg for C files
+                if (f.linkage == LINK.d || f.parameterList.length)
                 {
                     // Declare _argptr
                     Type t = target.va_listType(funcdecl.loc, sc);
@@ -611,7 +622,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                     for (size_t i = 0; i < funcdecl.returns.dim;)
                     {
                         Expression exp = (*funcdecl.returns)[i].exp;
-                        if (exp.op == TOK.variable && (cast(VarExp)exp).var == funcdecl.vresult)
+                        if (exp.op == EXP.variable && (cast(VarExp)exp).var == funcdecl.vresult)
                         {
                             if (addReturn0())
                                 exp.type = Type.tint32;
@@ -735,7 +746,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 // Check for errors related to 'nothrow'.
                 const blockexit = funcdecl.fbody.blockExit(funcdecl, f.isnothrow);
                 if (f.isnothrow && blockexit & BE.throw_)
-                    error(funcdecl.loc, "`nothrow` %s `%s` may throw", funcdecl.kind(), funcdecl.toPrettyChars());
+                    error(funcdecl.loc, "%s `%s` may throw but is marked as `nothrow`", funcdecl.kind(), funcdecl.toPrettyChars());
 
                 if (!(blockexit & (BE.throw_ | BE.halt) || funcdecl.flags & FUNCFLAG.hasCatches))
                 {
@@ -817,7 +828,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                     {
                         ReturnStatement rs = (*funcdecl.returns)[i];
                         Expression exp = rs.exp;
-                        if (exp.op == TOK.error)
+                        if (exp.op == EXP.error)
                             continue;
                         if (tret.ty == Terror)
                         {
@@ -1135,14 +1146,16 @@ private extern(C++) final class Semantic3Visitor : Visitor
 
                             s = s.statementSemantic(sc2);
 
-                            bool isnothrow = f.isnothrow & !(funcdecl.flags & FUNCFLAG.nothrowInprocess);
+                            immutable bool isnothrow = f.isnothrow && !(funcdecl.flags & FUNCFLAG.nothrowInprocess);
                             const blockexit = s.blockExit(funcdecl, isnothrow);
                             if (blockexit & BE.throw_)
+                            {
                                 funcdecl.eh_none = false;
-                            if (f.isnothrow && isnothrow && blockexit & BE.throw_)
-                                error(funcdecl.loc, "`nothrow` %s `%s` may throw", funcdecl.kind(), funcdecl.toPrettyChars());
-                            if (funcdecl.flags & FUNCFLAG.nothrowInprocess && blockexit & BE.throw_)
-                                f.isnothrow = false;
+                                if (isnothrow)
+                                    error(funcdecl.loc, "%s `%s` may throw but is marked as `nothrow`", funcdecl.kind(), funcdecl.toPrettyChars());
+                                else if (funcdecl.flags & FUNCFLAG.nothrowInprocess)
+                                    f.isnothrow = false;
+                            }
 
                             if (sbody.blockExit(funcdecl, f.isnothrow) == BE.fallthru)
                                 sbody = new CompoundStatement(Loc.initial, sbody, s);

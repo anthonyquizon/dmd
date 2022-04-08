@@ -8,9 +8,9 @@
  * - `invariant`
  * - `unittest`
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/func.d, _func.d)
  * Documentation:  https://dlang.org/phobos/dmd_func.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/func.d
@@ -261,6 +261,8 @@ extern (C++) class FuncDeclaration : Declaration
 
     VarDeclaration vresult;             /// result variable for out contracts
     LabelDsymbol returnLabel;           /// where the return goes
+
+    bool[size_t] isTypeIsolatedCache;   /// cache for the potentially very expensive isTypeIsolated check
 
     // used to prevent symbols in different
     // scopes from having the same name
@@ -1304,7 +1306,14 @@ extern (C++) class FuncDeclaration : Declaration
         if (!fbody)
             return false;
 
-        if (isVirtualMethod())
+        if (isVirtualMethod() &&
+            /*
+             * https://issues.dlang.org/show_bug.cgi?id=21719
+             *
+             * If we have an auto virtual function we can infer
+             * the attributes.
+             */
+            !(inferRetType && !isCtorDeclaration()))
             return false;               // since they may be overridden
 
         if (sc.func &&
@@ -1530,8 +1539,23 @@ extern (C++) class FuncDeclaration : Declaration
     extern (D) final bool isTypeIsolated(Type t)
     {
         StringTable!Type parentTypes;
-        parentTypes._init();
-        return isTypeIsolated(t, parentTypes);
+        const uniqueTypeID = t.getUniqueID();
+        if (uniqueTypeID)
+        {
+            const cacheResultPtr = uniqueTypeID in isTypeIsolatedCache;
+            if (cacheResultPtr !is null)
+                return *cacheResultPtr;
+
+            parentTypes._init();
+            const isIsolated = isTypeIsolated(t, parentTypes);
+            isTypeIsolatedCache[uniqueTypeID] = isIsolated;
+            return isIsolated;
+        }
+        else
+        {
+            parentTypes._init();
+            return isTypeIsolated(t, parentTypes);
+        }
     }
 
     ///ditto
@@ -3028,7 +3052,7 @@ FuncDeclaration resolveFuncCall(const ref Loc loc, Scope* sc, Dsymbol s,
         // all of overloads are templates
         if (td)
         {
-            .error(loc, "%s `%s.%s` cannot deduce function from argument types `!(%s)%s`",
+            .error(loc, "none of the overloads of %s `%s.%s` are callable using argument types `!(%s)%s`",
                    td.kind(), td.parent.toPrettyChars(), td.ident.toChars(),
                    tiargsBuf.peekChars(), fargsBuf.peekChars());
 
@@ -3056,7 +3080,11 @@ FuncDeclaration resolveFuncCall(const ref Loc loc, Scope* sc, Dsymbol s,
         return null;
 
     bool hasOverloads = fd.overnext !is null;
-    auto tf = fd.type.toTypeFunction();
+    auto tf = fd.type.isTypeFunction();
+    // if type is an error, the original type should be there for better diagnostics
+    if (!tf)
+        tf = fd.originalType.toTypeFunction();
+
     if (tthis && !MODimplicitConv(tthis.mod, tf.mod)) // modifier mismatch
     {
         OutBuffer thisBuf, funcBuf;

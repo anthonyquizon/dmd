@@ -1,9 +1,9 @@
 /**
  * An expandable buffer in which you can write text or binary data.
  *
- * Copyright: Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:   Walter Bright, http://www.digitalmars.com
- * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright: Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:   Walter Bright, https://www.digitalmars.com
+ * License:   $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:    $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/root/outbuffer.d, root/_outbuffer.d)
  * Documentation: https://dlang.org/phobos/dmd_root_outbuffer.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/root/outbuffer.d
@@ -727,15 +727,15 @@ struct OutBuffer
         return extractData();
     }
 
-    void writesLEB128(int value) nothrow
+    void writesLEB128(int value) pure nothrow
     {
         while (1)
         {
             ubyte b = value & 0x7F;
 
             value >>= 7;            // arithmetic right shift
-            if (value == 0 && !(b & 0x40) ||
-                value == -1 && (b & 0x40))
+            if ((value == 0 && !(b & 0x40)) ||
+                (value == -1 && (b & 0x40)))
             {
                  writeByte(b);
                  break;
@@ -744,7 +744,7 @@ struct OutBuffer
         }
     }
 
-    void writeuLEB128(uint value) nothrow
+    void writeuLEB128(uint value) pure nothrow
     {
         do
         {

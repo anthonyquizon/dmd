@@ -3,9 +3,9 @@
  *
  * Specification: $(LINK2 https://dlang.org/spec/abi.html#name_mangling, Name Mangling)
  *
- * Copyright: Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors: Walter Bright, http://www.digitalmars.com
- * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright: Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors: Walter Bright, https://www.digitalmars.com
+ * License:   $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:    $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dmangle.d, _dmangle.d)
  * Documentation:  https://dlang.org/phobos/dmd_dmangle.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/dmangle.d
@@ -143,9 +143,9 @@ import dmd.common.outbuffer;
 import dmd.root.aav;
 import dmd.root.string;
 import dmd.root.stringtable;
+import dmd.root.utf;
 import dmd.target;
 import dmd.tokens;
-import dmd.utf;
 import dmd.visitor;
 
 private immutable char[TMAX] mangleChar =
@@ -726,7 +726,8 @@ public:
     extern (D) static const(char)[] externallyMangledIdentifier(Declaration d)
     {
         const par = d.toParent(); //toParent() skips over mixin templates
-        if (!par || par.isModule() || d.linkage == LINK.cpp)
+        if (!par || par.isModule() || d.linkage == LINK.cpp ||
+            (d.linkage == LINK.c && d.isCsymbol() && d.isFuncDeclaration()))
         {
             if (d.linkage != LINK.d && d.localNum)
                 d.error("the same declaration cannot be in multiple scopes with non-D linkage");
@@ -979,7 +980,7 @@ public:
                     goto Lsa;
                 }
                 buf.writeByte('V');
-                if (ea.op == TOK.tuple)
+                if (ea.op == EXP.tuple)
                 {
                     ea.error("tuple is not a valid template value argument");
                     continue;
@@ -987,7 +988,7 @@ public:
                 // Now that we know it is not an alias, we MUST obtain a value
                 uint olderr = global.errors;
                 ea = ea.ctfeInterpret();
-                if (ea.op == TOK.error || olderr != global.errors)
+                if (ea.op == EXP.error || olderr != global.errors)
                     continue;
 
                 /* Use type mangling that matches what it would be for a function parameter
