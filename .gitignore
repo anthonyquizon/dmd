@@ -48,3 +48,4 @@ src/optabgen.dSYM/
 # IntelliJ IDEA / CLion
 .idea/
 dmd.iml
+__coding__/
