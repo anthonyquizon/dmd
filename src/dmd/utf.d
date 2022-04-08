@@ -285,7 +285,6 @@ bool isUniAlpha(dchar c)
         [0x3105, 0x312C],
         [0x4E00, 0x9FA5],
         [0xAC00, 0xD7A3],
-
     ];
 
     size_t high = ALPHA_TABLE.length - 1;
